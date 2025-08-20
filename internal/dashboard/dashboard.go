@@ -16,106 +16,79 @@ type Theme struct {
 	LinkColor      lipgloss.AdaptiveColor
 }
 
-// DefaultTheme is a good starting point.
-var DefaultTheme = Theme{
-	AccentColor: lipgloss.AdaptiveColor{
-		Light: "#c19beb", // light mode purple-ish
-		Dark:  "#a374d0", // dark mode purple-ish
-	},
-	SecondaryColor: lipgloss.AdaptiveColor{
-		Light: "#B3B3B3", // light mode grey
-		Dark:  "#666666", // dark mode grey
-	},
-	HighlightColor: lipgloss.AdaptiveColor{
-		Light: "#FFCC00", // yellow/orange
-		Dark:  "#e6b800", // slightly darker yellow
-	},
-	TextColor: lipgloss.AdaptiveColor{
-		Light: "#FFFFFF", // white
-		Dark:  "#EEEEEE", // light grey for dark mode
-	},
-	LinkColor: lipgloss.AdaptiveColor{
-		Light: "#43BF6D", // cyan/blue
-		Dark:  "#73F59F", // darker cyan/blue
-	},
-}
-
-// PrintDashboard prints user stats in a pfetch-style layout
-func PrintDashboard(user *github.UserInfo, theme ...Theme) {
-	// Use DefaultTheme if no theme is provided
-	th := DefaultTheme
-	if len(theme) > 0 {
-		th = theme[0]
+func PrintDashboard(user *github.UserInfo) {
+	// Terminal-based colors (ANSI)t ...
+	// 1=red, 2=green, 3=yellow, 4=blue, 5=magenta, 6=cyan, 7=white, 8=bright variants
+	theme := Theme{
+		AccentColor:    lipgloss.AdaptiveColor{Light: "4", Dark: "4"}, // Blue
+		SecondaryColor: lipgloss.AdaptiveColor{Light: "7", Dark: "7"}, // White/Grey
+		HighlightColor: lipgloss.AdaptiveColor{Light: "3", Dark: "3"}, // Yellow
+		TextColor:      lipgloss.AdaptiveColor{Light: "7", Dark: "7"}, // White
+		LinkColor:      lipgloss.AdaptiveColor{Light: "6", Dark: "6"}, // Cyan
 	}
 
-	// Define styles using the provided theme.
-	keyStyle := lipgloss.NewStyle().
+	// --- Styles ---
+	labelStyle := lipgloss.NewStyle().
+		Foreground(theme.AccentColor).
 		Bold(true).
-		Foreground(th.AccentColor).
-		Align(lipgloss.Right)
+		Padding(0, 1)
+
+	boxStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(theme.SecondaryColor).
+		Padding(0, 1).
+		MarginRight(2)
 
 	valueStyle := lipgloss.NewStyle().
-		Foreground(th.TextColor).
-		Align(lipgloss.Left)
-
-	headerStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(th.HighlightColor)
+		Foreground(theme.TextColor)
 
 	bioStyle := lipgloss.NewStyle().
-		Foreground(th.SecondaryColor).
-		Faint(true).
-		Width(45).
-		PaddingBottom(1)
+		Foreground(theme.SecondaryColor).
+		Faint(true)
 
 	urlStyle := lipgloss.NewStyle().
-		Foreground(th.LinkColor).
+		Foreground(theme.LinkColor).
 		Underline(true)
 
-	// Helper function to create a formatted line if the value is not empty.
-	createInfoLine := func(key, value string, style lipgloss.Style) string {
-		if value == "" {
-			return ""
-		}
-		return lipgloss.JoinHorizontal(lipgloss.Left,
-			keyStyle.Render(key+":"),
-			" "+style.Render(value),
-		)
-	}
+	headerStyle := lipgloss.NewStyle().
+		Foreground(theme.HighlightColor).
+		Bold(true)
 
-	// Header: Name @login
-	header := headerStyle.Render(fmt.Sprintf("%s @%s", user.Name, user.Login))
-
-	// Bio
-	var bio string
-	if user.Bio != "" {
-		bio = bioStyle.Render(user.Bio)
-	}
-
-	// Main Stats
-	stats := lipgloss.JoinVertical(lipgloss.Left,
-		createInfoLine("Followers", fmt.Sprintf("%d", user.Followers), valueStyle),
-		createInfoLine("Following", fmt.Sprintf("%d", user.Following), valueStyle),
+	// --- Labels (with icons) ---
+	labels := lipgloss.JoinVertical(lipgloss.Left,
+		labelStyle.Render(" user"),
+		labelStyle.Render(" bio"),
+		"",
+		labelStyle.Render(" Public Repos"), // TODO: Replace With Stars
+		labelStyle.Render(" followers"),
+		labelStyle.Render(" following"),
+		"",                             // blank line
+		labelStyle.Render(" company"), // briefcase
+		labelStyle.Render(" country"),
+		labelStyle.Render(" website"),
 	)
 
-	// Company, Location, Website
-	info := lipgloss.JoinVertical(lipgloss.Left,
-		createInfoLine("Company", user.Company, valueStyle),
-		createInfoLine("Location", user.Country, valueStyle),
-		createInfoLine("Website", user.Website, urlStyle),
+	left := boxStyle.Render(labels)
+
+	// --- Right column values ---
+	rightValues := lipgloss.JoinVertical(lipgloss.Left,
+		headerStyle.Render(fmt.Sprintf("%s (@%s)", user.Name, user.Login)),
+		bioStyle.Render(user.Bio),
+		"", // spacing line
+		valueStyle.Render(fmt.Sprintf("%d", user.PublicRepos)),
+		valueStyle.Render(fmt.Sprintf("%d", user.Followers)),
+		valueStyle.Render(fmt.Sprintf("%d", user.Following)),
+		"", // spacing line
+		valueStyle.Render(user.Company),
+		valueStyle.Render(user.Country),
+		urlStyle.Render(user.Website),
 	)
 
-	rightSide := lipgloss.JoinVertical(lipgloss.Left, header, bio, stats, "", info)
+	// align with first label (skip border line)
+	right := lipgloss.NewStyle().MarginTop(1).Render(rightValues)
 
-	// Get your ASCII art here
-	// asciiArt := getAsciiArt()
-
-	// TODO: Combine ASCII art and stats
-	dashboard := lipgloss.NewStyle().
-		Padding(1, 0).
-		Render(lipgloss.JoinHorizontal(lipgloss.Top,
-			lipgloss.NewStyle().Render(rightSide),
-		))
+	// --- Final Layout ---
+	dashboard := lipgloss.JoinHorizontal(lipgloss.Top, left, right)
 
 	fmt.Println(dashboard)
 }
